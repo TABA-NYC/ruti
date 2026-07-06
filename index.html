@@ -20,13 +20,13 @@
   .fadein{animation:fadein .25s ease both}
   header.app{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
   .brand{display:flex;align-items:center;gap:12px}
-  .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#6366f1,#a855f7);display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;box-shadow:var(--shadow)}
+  .logo{width:48px;height:48px;display:grid;place-items:center}
+  .logo svg{width:100%;height:100%}
   .brand h1{font-size:19px;margin:0;letter-spacing:-.2px}
-  .brand .sub{font-size:12px;color:var(--muted);margin-top:2px}
-  .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6d28d9;background:#ede9fe;padding:3px 7px;border-radius:999px;vertical-align:middle;margin-left:8px}
-  .whoami{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .account{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .account .welcome{font-size:14px;font-weight:600;color:var(--muted)}
+  .account .avatar{width:32px;height:32px;border-radius:50%;background:#F97316;color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
   select,input,textarea,button{font-family:inherit}
-  .whoami select{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:7px 10px;font-weight:600;color:var(--ink)}
 
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;box-shadow:var(--shadow);margin-bottom:16px}
   .filters{display:none;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;box-shadow:var(--shadow);margin:-8px 0 16px}
@@ -175,11 +175,49 @@
 <div class="wrap">
   <header class="app">
     <div class="brand">
-      <div class="logo">R</div>
-      <div>
-        <h1>Ruti <span class="tag">Now with scheduling</span></h1>
-        <div class="sub">The Pruyn Family Planner — shared, so you both know who's got what.</div>
+      <div class="logo" aria-label="Ruti">
+        <!-- Ruti mark: retro round mascot from Tyler's sketch — orange + black, white accents -->
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img">
+          <!-- arms (pointing up-out) -->
+          <path d="M18 31 Q11 28 9.5 21" fill="none" stroke="#111111" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M46 31 Q53 28 54.5 21" fill="none" stroke="#111111" stroke-width="3.2" stroke-linecap="round"/>
+          <!-- gloves: white pointing hands -->
+          <rect x="7.4" y="10.5" width="2.8" height="7" rx="1.4" fill="#FFFFFF" stroke="#111111" stroke-width="1.4"/>
+          <circle cx="8.8" cy="18.5" r="3.4" fill="#FFFFFF" stroke="#111111" stroke-width="1.4"/>
+          <rect x="53.8" y="10.5" width="2.8" height="7" rx="1.4" fill="#FFFFFF" stroke="#111111" stroke-width="1.4"/>
+          <circle cx="55.2" cy="18.5" r="3.4" fill="#FFFFFF" stroke="#111111" stroke-width="1.4"/>
+          <!-- legs + shoes -->
+          <path d="M27 51 v5 M37 51 v5" stroke="#111111" stroke-width="3" stroke-linecap="round"/>
+          <ellipse cx="24.5" cy="58.5" rx="4.8" ry="2.9" fill="#FFFFFF" stroke="#111111" stroke-width="1.6"/>
+          <ellipse cx="39.5" cy="58.5" rx="4.8" ry="2.9" fill="#FFFFFF" stroke="#111111" stroke-width="1.6"/>
+          <!-- shorts -->
+          <path d="M23.5 40.5 Q32 43.5 40.5 40.5 L41.5 50 Q36.8 52.2 32 52.2 Q27.2 52.2 22.5 50 Z" fill="#111111"/>
+          <!-- head -->
+          <circle cx="32" cy="28" r="15" fill="#F97316" stroke="#111111" stroke-width="2"/>
+          <!-- backwards cap -->
+          <path d="M17.6 23.5 A15 15 0 0 1 46.4 23.5 Q46 25.5 44.2 25.2 Q32 17.5 19.8 25.2 Q18 25.5 17.6 23.5 Z" fill="#111111"/>
+          <path d="M44.5 19.5 Q54.5 17.5 55.5 21.5 Q55.8 24.5 45.5 24.2 Z" fill="#111111"/>
+          <circle cx="32" cy="14.5" r="1.5" fill="#FFFFFF"/>
+          <!-- pie-cut eyes -->
+          <ellipse cx="26.5" cy="29" rx="2.8" ry="4.2" fill="#111111"/>
+          <ellipse cx="37.5" cy="29" rx="2.8" ry="4.2" fill="#111111"/>
+          <circle cx="27.4" cy="27.4" r="1.1" fill="#FFFFFF"/>
+          <circle cx="38.4" cy="27.4" r="1.1" fill="#FFFFFF"/>
+          <!-- nose -->
+          <ellipse cx="32" cy="35" rx="2.6" ry="2" fill="#111111"/>
+          <circle cx="33" cy="34.4" r="0.8" fill="#FFFFFF"/>
+          <!-- big grin with teeth -->
+          <path d="M23.5 36 Q32 45.5 40.5 36 Q40 41.5 36 43.4 Q32 45.2 28 43.4 Q24 41.5 23.5 36 Z" fill="#111111"/>
+          <path d="M26 38.4 Q32 41.6 38 38.4 L37.4 40.2 Q32 42.8 26.6 40.2 Z" fill="#FFFFFF"/>
+        </svg>
       </div>
+      <div>
+        <h1>Ruti</h1>
+      </div>
+    </div>
+    <div class="account" title="Account">
+      <span class="welcome">Welcome, Tyler</span>
+      <span class="avatar">T</span>
     </div>
   </header>
 
