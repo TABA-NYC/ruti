@@ -28,12 +28,16 @@
   .account .avatar{width:32px;height:32px;border-radius:50%;background:#F97316;color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
   select,input,textarea,button{font-family:inherit}
 
-  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;box-shadow:var(--shadow);margin-bottom:16px}
-  .filters{display:none;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;box-shadow:var(--shadow);margin:-8px 0 16px}
+  .filters{display:none;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;box-shadow:var(--shadow);margin:0 0 16px}
   .filters.show{display:flex}
-  .viewbar{display:flex;margin-bottom:8px}
-  .toolbar .grow{flex:1 1 184px}
-  .toolbar input[type=search]{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px}
+  .viewbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .vleft,.vright{display:flex;align-items:center;gap:8px}
+  .iconbtn{width:40px;height:40px;border:1px solid var(--line);background:var(--panel);border-radius:8px;display:grid;place-items:center;color:var(--ink);cursor:pointer}
+  .iconbtn svg{width:18px;height:18px}
+  .iconbtn:hover{background:#f1f2f7}
+  /* search slides out from the magnifier */
+  .qslide{width:0;opacity:0;padding:8px 0;border:0;font-size:14px;border-radius:8px;transition:width .25s cubic-bezier(.4,0,.2,1),opacity .2s ease,padding .25s}
+  .qslide.open{width:208px;opacity:1;padding:8px 12px;border:1px solid var(--line);background:var(--panel)}
   .seg{display:inline-flex;background:#f1f2f7;border-radius:8px;padding:4px}
   .seg button{border:0;background:transparent;padding:8px 12px;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;font-weight:600}
   .seg button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
@@ -217,10 +221,22 @@
     </div>
   </header>
 
-  <div class="toolbar">
-    <div class="grow"><input id="q" type="search" placeholder="Search tasks…" /></div>
-    <button class="btn ghost" id="filterBtn">Filters ▾</button>
-    <button class="btn primary" id="addBtn">Add Task</button>
+  <div class="viewbar">
+    <div class="vleft">
+      <div class="seg" id="viewSeg">
+        <span class="slide" aria-hidden="true"></span>
+        <button data-view="board" class="on">Board</button>
+        <button data-view="upcoming">Upcoming</button>
+      </div>
+      <button class="iconbtn" id="searchBtn" title="Search Tasks">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+      </button>
+      <input id="q" type="search" class="qslide" placeholder="Search tasks…" />
+    </div>
+    <div class="vright">
+      <button class="btn ghost" id="filterBtn">Filters ▾</button>
+      <button class="btn primary" id="addBtn">Add Task</button>
+    </div>
   </div>
 
   <div class="filters" id="filterPanel">
@@ -241,14 +257,6 @@
     <label class="toggle"><input type="checkbox" id="fToday" /> Today</label>
     <label class="toggle"><input type="checkbox" id="fCrit" /> Critical</label>
     <label class="toggle" title="Show items scheduled further out than their reminder window"><input type="checkbox" id="fSched" /> Show Scheduled</label>
-  </div>
-
-  <div class="viewbar">
-    <div class="seg" id="viewSeg">
-      <span class="slide" aria-hidden="true"></span>
-      <button data-view="board" class="on">Board</button>
-      <button data-view="upcoming">Upcoming</button>
-    </div>
   </div>
 
   <div class="board" id="board"></div>
@@ -969,6 +977,16 @@
 
   // toolbar
   el("q").addEventListener("input",function(){filters.q=this.value;render();});
+  el("searchBtn").addEventListener("click",function(){
+    var q=el("q");
+    if(q.className.indexOf("open")>=0){
+      q.className="qslide";
+      if(q.value){q.value="";filters.q="";render();}
+    } else {
+      q.className="qslide open";
+      setTimeout(function(){q.focus();},260);
+    }
+  });
   el("fOwner").addEventListener("change",function(){filters.owner=this.value;render();});
   el("fTime").addEventListener("change",function(){filters.time=this.value;render();});
   el("fToday").addEventListener("change",function(){filters.today=this.checked;render();});
