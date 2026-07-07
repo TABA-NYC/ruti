@@ -168,6 +168,9 @@
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .secrow{display:grid;grid-template-columns:1fr 96px 96px 32px;gap:8px;align-items:end}
   .secrow .icon{align-self:end}
+  .daysrow{display:flex;gap:8px}
+  .daybtn{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;padding:0}
+  .daybtn.on{background:#6366f1;border-color:#6366f1;color:#fff}
   .critline{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:700;color:var(--crit);cursor:pointer;user-select:none}
   .critline input{accent-color:var(--crit)}
   .schedrow{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:11px;display:grid;gap:10px}
@@ -309,6 +312,18 @@
           </select>
         </div>
       </div>
+      <div class="fld" id="daysFld" style="display:none">
+        <label>Days of the Week</label>
+        <div class="daysrow" id="mDays">
+          <button type="button" class="daybtn" data-day="0">S</button>
+          <button type="button" class="daybtn" data-day="1">M</button>
+          <button type="button" class="daybtn" data-day="2">T</button>
+          <button type="button" class="daybtn" data-day="3">W</button>
+          <button type="button" class="daybtn" data-day="4">T</button>
+          <button type="button" class="daybtn" data-day="5">F</button>
+          <button type="button" class="daybtn" data-day="6">S</button>
+        </div>
+      </div>
       <div class="schedrow">
         <div class="lbl">Schedule Ahead</div>
         <div class="grid2">
@@ -429,6 +444,29 @@
     var n=daysUntil(t.due);
     return n!==null&&n>leadOf(t);
   }
+  var DAYS_SHORT=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  /* Pushed (snoozed) to a later day — off the board until then */
+  function snoozedAway(t){
+    if(t.status==="done"||!t.snoozeUntil)return false;
+    return daysUntil(t.snoozeUntil)>0;
+  }
+  /* Day-of-week tasks (e.g. Peloton Wed + Fri) hide on non-matching days */
+  function dayHidden(t,dow){
+    if(t.status==="done"||!t.days||!t.days.length)return false;
+    var d=(dow===undefined)?new Date().getDay():dow;
+    return t.days.indexOf(d)<0;
+  }
+  /* At the first open of a new day: clear expired pushes, reset daily & day-based tasks */
+  function newDayReset(d){
+    var t=iso(today());
+    if(d.lastOpened===t)return d;
+    d.lastOpened=t;
+    (d.tasks||[]).forEach(function(x){
+      if(x.snoozeUntil&&daysUntil(x.snoozeUntil)<=0)x.snoozeUntil=null;
+      if(x.status==="done"&&(x.cadence==="daily"||(x.days&&x.days.length)))x.status="todo";
+    });
+    return d;
+  }
 
   /* ---------- risk logic (pure, testable) ---------- */
   function risk(t){
@@ -460,16 +498,19 @@
       if(t.repeat===undefined)t.repeat="none";
       if(t.leadDays===undefined)t.leadDays=DEFAULT_LEAD;
       if(t.category===undefined)t.category="none";
+      if(t.days===undefined)t.days=null;
+      if(t.snoozeUntil===undefined)t.snoozeUntil=null;
     });
     if(!d.sections)d.sections=DEFAULT_SECTIONS.map(function(s){return{k:s.k,label:s.label,start:s.start,end:s.end};});
-    return d;
+    return newDayReset(d);
   }
 
   /* ---------- seed ---------- */
   function seed(){
     var id=0;function n(){return"t"+(++id)+"-"+Math.random().toString(36).slice(2,6);}
     function mk(o){o.id=n();if(o.critical===undefined)o.critical=false;if(o.notes===undefined)o.notes="";if(o.due===undefined)o.due=null;
-      if(o.repeat===undefined)o.repeat="none";if(o.leadDays===undefined)o.leadDays=DEFAULT_LEAD;if(o.category===undefined)o.category="none";return o;}
+      if(o.repeat===undefined)o.repeat="none";if(o.leadDays===undefined)o.leadDays=DEFAULT_LEAD;if(o.category===undefined)o.category="none";
+      if(o.days===undefined)o.days=null;if(o.snoozeUntil===undefined)o.snoozeUntil=null;return o;}
     return {currentUser:"tyler",sections:DEFAULT_SECTIONS.map(function(s){return{k:s.k,label:s.label,start:s.start,end:s.end};}),tasks:[
       mk({title:"Feed Ruthie",owner:"tyler",status:"todo",cadence:"daily",timeblock:"morning"}),
       mk({title:"Bottle + ABC flashcards with Clay",owner:"darcy",status:"todo",cadence:"daily",timeblock:"morning"}),
@@ -477,7 +518,7 @@
       mk({title:"Kitchen reset (dishes, high chair, coffee)",owner:"tyler",status:"todo",cadence:"daily",timeblock:"morning"}),
       mk({title:"Prepare breakfast",owner:"darcy",status:"inprogress",cadence:"daily",timeblock:"morning"}),
       mk({title:"Darcy shower (10–11)",owner:"darcy",status:"todo",cadence:"daily",timeblock:"midday"}),
-      mk({title:"Peloton ride + shower",owner:"tyler",status:"todo",cadence:"recurring",timeblock:"midday",notes:"Wed & Fri lunch"}),
+      mk({title:"Peloton ride + shower",owner:"tyler",status:"todo",cadence:"recurring",timeblock:"midday",days:[3,5],notes:"Wed & Fri lunch"}),
       mk({title:"Family dog walk",owner:"family",status:"todo",cadence:"daily",timeblock:"evening"}),
       mk({title:"Dinner prep",owner:"darcy",status:"todo",cadence:"daily",timeblock:"evening"}),
       mk({title:"Clean table + load dishwasher",owner:"tyler",status:"todo",cadence:"daily",timeblock:"evening"}),
@@ -525,9 +566,9 @@
     }
     return true;
   }
-  /* board additionally hides scheduled-away items unless toggled on */
+  /* board additionally hides scheduled-away, pushed, and off-day items unless toggled on */
   function passesBoard(t){
-    if(!filters.showSched&&scheduledAway(t))return false;
+    if(!filters.showSched&&(scheduledAway(t)||snoozedAway(t)||dayHidden(t)))return false;
     return passes(t);
   }
 
@@ -560,12 +601,14 @@
       var dcls="pill due"+(r.overdue?" over":(r.n<=2?" warn":""));
       pills+='<span class="'+dcls+'">'+ic("calendar")+' '+esc(fmtDue(t.due))+'</span>';
     }
+    if(t.days&&t.days.length)pills+='<span class="pill rep">'+ic("repeat")+' '+t.days.map(function(d){return DAYS_SHORT[d];}).join(" · ")+'</span>';
     if(r.criticalAtRisk)pills+='<span class="pill risk">'+ic("warn")+' At Risk</span>';
     else if(t.critical)pills+='<span class="pill risk">'+ic("crit")+' Critical</span>';
-    /* recurring / scheduled indicators live bottom-right */
+    /* recurring / scheduled / pushed indicators live bottom-right */
     var ind="";
     if(t.repeat&&t.repeat!=="none")ind+='<span class="cind" title="Repeats '+REPEATS[t.repeat].label+'">'+ic("repeat")+'</span>';
     if(scheduledAway(t))ind+='<span class="cind" title="Scheduled — surfaces '+leadOf(t)+' days before due">'+ic("clock")+'</span>';
+    if(snoozedAway(t))ind+='<span class="cind" title="Pushed to '+esc(fmtShort(t.snoozeUntil))+'">'+ic("clock")+'</span>';
 
     return '<div class="'+cls+'" draggable="true" data-id="'+t.id+'">'+
       '<div class="top">'+
@@ -615,9 +658,10 @@
     if(n<31)return"Next 30 days";
     return"Later";
   }
+  function effDate(t){return t.due||t.snoozeUntil||null;}
   function urow(t){
     var r=risk(t);
-    var when=r.n<0?((-r.n)+"d overdue"):fmtShort(t.due);
+    var when=t.due?(r.n<0?((-r.n)+"d overdue"):fmtShort(t.due)):("Pushed · "+fmtShort(t.snoozeUntil));
     var pills="";
     if(t.repeat&&t.repeat!=="none")pills+='<span class="pill rep">'+ic("repeat")+' '+REPEATS[t.repeat].label+'</span>';
     if(r.criticalAtRisk)pills+='<span class="pill risk">'+ic("warn")+' At Risk</span>';
@@ -633,12 +677,12 @@
   function renderUpcoming(){
     var up=el("upcoming");
     var items=data.tasks.filter(function(t){
-      return t.status!=="done"&&t.due&&passes(t);
+      return t.status!=="done"&&effDate(t)&&passes(t);
     });
-    items.sort(function(x,y){return daysUntil(x.due)-daysUntil(y.due);});
+    items.sort(function(x,y){return daysUntil(effDate(x))-daysUntil(effDate(y));});
     if(!items.length){up.innerHTML='<div class="uempty">Nothing scheduled — add a task with a due date to see it here.</div>';return;}
     var groups={};
-    items.forEach(function(t){var b=bucketOf(daysUntil(t.due));(groups[b]=groups[b]||[]).push(t);});
+    items.forEach(function(t){var b=bucketOf(daysUntil(effDate(t)));(groups[b]=groups[b]||[]).push(t);});
     var html="";
     BUCKETS.forEach(function(b){
       if(!groups[b])return;
@@ -773,15 +817,39 @@
     el("mTime").value=t.timeblock;el("mDue").value=t.due||"";el("mCrit").checked=!!t.critical;el("mNotes").value=t.notes||"";
     el("mRepeat").value=t.repeat||"none";
     el("mLead").value=String(leadOf(t));
+    setDayPicker(t.days||[]);
+    updateDaysVisibility();
     el("mDelete").style.visibility=id?"visible":"hidden";
     el("scrim").className="scrim show";setTimeout(function(){el("mName").focus();},30);
   }
+  function setDayPicker(days){
+    var btns=el("mDays").querySelectorAll(".daybtn");
+    for(var i=0;i<btns.length;i++){
+      var d=+btns[i].getAttribute("data-day");
+      btns[i].className="daybtn"+(days.indexOf(d)>=0?" on":"");
+    }
+  }
+  function getDayPicker(){
+    var out=[],btns=el("mDays").querySelectorAll(".daybtn.on");
+    for(var i=0;i<btns.length;i++)out.push(+btns[i].getAttribute("data-day"));
+    return out.length?out:null;
+  }
+  function updateDaysVisibility(){
+    var c=el("mCadence").value;
+    el("daysFld").style.display=(c==="weekly"||c==="recurring")?"":"none";
+  }
+  el("mCadence").addEventListener("change",updateDaysVisibility);
+  el("mDays").addEventListener("click",function(e){
+    var b=e.target.closest(".daybtn");if(!b)return;
+    b.className="daybtn"+(b.className.indexOf(" on")>=0?"":" on");
+  });
   function closeModal(){el("scrim").className="scrim";editingId=null;}
   function saveModal(){
     var title=el("mName").value.trim();if(!title){el("mName").focus();return;}
     var fields={title:title,owner:el("mOwner").value,status:el("mStatus").value,cadence:el("mCadence").value,
       timeblock:el("mTime").value,due:el("mDue").value||null,critical:el("mCrit").checked,notes:el("mNotes").value.trim(),
       repeat:el("mRepeat").value,leadDays:+el("mLead").value};
+    fields.days=(fields.cadence==="weekly"||fields.cadence==="recurring")?getDayPicker():null;
     if(fields.repeat!=="none"&&!fields.due){fields.due=iso(today());}
     if(editingId){var t=byId(editingId);for(var k in fields)t[k]=fields[k];}
     else{fields.id="t"+Date.now()+"-"+Math.random().toString(36).slice(2,6);data.tasks.push(fields);
@@ -798,6 +866,13 @@
     STATUSES.forEach(function(s){
       if(s.k!==t.status)html+='<button data-menu="move" data-st="'+s.k+'" data-id="'+id+'">Move to '+s.label+'</button>';
     });
+    if(t.status!=="done"){
+      html+='<div class="sep"></div>';
+      html+='<button data-menu="push" data-n="1" data-id="'+id+'">Push to Tomorrow</button>';
+      html+='<button data-menu="push" data-n="2" data-id="'+id+'">Push Later This Week</button>';
+      html+='<button data-menu="push" data-n="7" data-id="'+id+'">Push to Next Week</button>';
+      if(t.snoozeUntil)html+='<button data-menu="unpush" data-id="'+id+'">Bring Back Today</button>';
+    }
     html+='<div class="sep"></div>';
     html+='<button data-menu="crit" data-id="'+id+'">'+(t.critical?"Remove Critical":"Mark Critical")+'</button>';
     html+='<div class="sep"></div>';
@@ -822,6 +897,19 @@
     if(act==="move")setStatus(id,b.getAttribute("data-st"));
     else if(act==="crit")toggleCrit(id);
     else if(act==="del")del(id);
+    else if(act==="push"){
+      var t=byId(id);
+      if(t){
+        t.snoozeUntil=iso(addDays(+b.getAttribute("data-n")));
+        if(t.status!=="todo")t.status="todo";
+        toast('Pushed to '+fmtShort(t.snoozeUntil)+' — it will come back that day');
+        render();
+      }
+    }
+    else if(act==="unpush"){
+      var u=byId(id);
+      if(u){u.snoozeUntil=null;toast("Back on today's board");render();}
+    }
   });
   document.addEventListener("click",function(e){
     if(!e.target.closest("#cmenu")&&!e.target.closest('[data-act="menu"]'))closeMenu();
@@ -996,7 +1084,7 @@
   render();
 
   // expose for tests
-  window.__TANDEM__={risk:risk,passes:passes,passesBoard:passesBoard,scheduledAway:scheduledAway,nextDue:nextDue,bucketOf:bucketOf,blockPast:blockPast,todoSections:todoSections,card:card,sections:sections,hourLabel:hourLabel,secRowHTML:secRowHTML,get:function(){return data;},setFilters:function(f){filters=Object.assign(filters,f);}};
+  window.__TANDEM__={risk:risk,passes:passes,passesBoard:passesBoard,scheduledAway:scheduledAway,snoozedAway:snoozedAway,dayHidden:dayHidden,newDayReset:newDayReset,effDate:effDate,nextDue:nextDue,bucketOf:bucketOf,blockPast:blockPast,todoSections:todoSections,card:card,sections:sections,hourLabel:hourLabel,secRowHTML:secRowHTML,get:function(){return data;},setFilters:function(f){filters=Object.assign(filters,f);}};
 })();
 </script>
 </body>
