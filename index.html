@@ -179,10 +179,40 @@
   .foot .right{display:flex;gap:8px}
   .link{border:0;background:transparent;color:var(--crit);font-weight:700;cursor:pointer;font-size:13px}
   footer.note{margin-top:22px;color:var(--muted);font-size:12px;text-align:center;line-height:1.6}
+
+  /* ---------- auth gate (Phase 2) ---------- */
+  .hidden{display:none !important}
+  .authgate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+  .authcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:40px 32px;max-width:360px;width:100%;text-align:center;animation:fadein .4s ease both}
+  .authcard .alogo{width:96px;height:96px;margin:0 auto 16px}
+  .authcard .alogo img{width:100%;height:100%;object-fit:contain}
+  .authcard h1{font-size:24px;margin:0 0 8px;letter-spacing:-.2px}
+  .authcard p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 24px}
+  .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+  .gbtn:hover{background:#f8fafc}
+  .gbtn svg{width:18px;height:18px;flex:0 0 18px}
+  .authnote{margin-top:16px;font-size:12px;color:var(--muted)}
+  .account .avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+  .syncdot{width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;margin-right:4px}
+  .syncdot.off{background:#f59e0b}
 </style>
 </head>
 <body>
-<div class="wrap">
+<!-- Auth gate: shown when signed out (Phase 2 live sync) -->
+<div class="authgate hidden" id="authGate">
+  <div class="authcard">
+    <div class="alogo"><img src="dog-mark.svg" alt="Ruti" /></div>
+    <h1>Ruti</h1>
+    <p>Your family's shared planner.<br/>Sign in to see your live board.</p>
+    <button class="gbtn" id="googleBtn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#EA4335" d="M12 4.75c1.61 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.49 14.97.5 12 .5 7.7.5 3.99 2.97 2.18 6.56l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+    <div class="authnote">One board, both phones, always in sync.</div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="appWrap">
   <header class="app">
     <div class="brand">
       <div class="logo">
@@ -192,9 +222,9 @@
         <h1>Ruti</h1>
       </div>
     </div>
-    <div class="account" title="Account">
-      <span class="welcome">Welcome, Tyler</span>
-      <span class="avatar">T</span>
+    <div class="account" id="accountBtn" title="Account">
+      <span class="welcome" id="welcomeTxt">Welcome</span>
+      <span class="avatar" id="avatarEl">·</span>
     </div>
   </header>
 
@@ -240,9 +270,9 @@
   <div class="upcoming" id="upcoming"></div>
 
   <footer class="note">
-    Ruti · prototype with advance scheduling · your data is saved on this device only for now.<br/>
+    <span id="syncStatus"><span class="syncdot"></span>Ruti · live shared board — changes sync between your devices in seconds.</span><br/>
     Schedule bills, appointments &amp; events ahead — they wait in Upcoming and surface on the board when their reminder window opens.<br/>
-    Next milestones: shared live sync between you &amp; Darcy · notifications · multi-family beta.
+    Next milestones: notifications · multi-family beta.
   </footer>
 </div>
 
@@ -370,9 +400,15 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 (function(){
   "use strict";
+  /* ---------- Phase 2: Supabase live sync config ---------- */
+  var SUPA_URL="https://ndoardehnnitarivguss.supabase.co";
+  var SUPA_KEY="sb_publishable_c8oBGO-L1M9lORsnUJzaSg_7AfmthDv"; /* publishable key — safe to embed; RLS is the boundary */
+  var TYLER_EMAIL="tpruyn@gmail.com", DARCY_EMAIL="darcy923@gmail.com";
+  var supa=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SUPA_URL,SUPA_KEY):null;
   var OWNERS={
     tyler:{name:"Tyler",color:"#3b82f6"},
     darcy:{name:"Darcy",color:"#a855f7"},
@@ -505,6 +541,190 @@
     return newDayReset(d);
   }
 
+  /* ---------- Phase 2: cloud sync (Supabase) ----------
+     data.tasks stays the in-memory truth; save() caches locally and queues a
+     diff-sync. Tasks sync as individual rows; sections live on the household. */
+  var HOUSE=null,myUid=null,myOwnerKey="tyler";
+  var snap={};        /* id -> serialized last-synced row */
+  var secSnap="";     /* serialized last-synced sections */
+  var posMap={};      /* id -> board position */
+  var channel=null,syncTimer=null,retryTimer=null,pendingRender=false;
+
+  /*SYNC-PURE-BEGIN*/
+  function taskToRow(t,pos,house){
+    return {id:t.id,household_id:house,title:t.title||"",owner:t.owner||"floating",status:t.status||"todo",
+      cadence:t.cadence||"oneoff",timeblock:t.timeblock||"anytime",due:t.due||null,repeat:t.repeat||"none",
+      lead_days:(t.leadDays===null||t.leadDays===undefined)?7:+t.leadDays,days:(t.days&&t.days.length)?t.days:null,
+      snooze_until:t.snoozeUntil||null,critical:!!t.critical,notes:t.notes||"",category:t.category||"none",
+      position:(pos===undefined?0:pos)};
+  }
+  function rowToTask(r){
+    return {id:r.id,title:r.title,owner:r.owner,status:r.status,cadence:r.cadence,timeblock:r.timeblock,
+      due:r.due||null,repeat:r.repeat||"none",leadDays:(r.lead_days===null||r.lead_days===undefined)?7:r.lead_days,
+      days:r.days||null,snoozeUntil:r.snooze_until||null,critical:!!r.critical,notes:r.notes||"",category:r.category||"none"};
+  }
+  /* canonical serialization for echo suppression + diffing */
+  function comparable(r){return JSON.stringify(taskToRow(rowToTask(r),r.position,r.household_id));}
+  function computeDiff(tasks,snapObj,house){
+    var ups=[],dels=[],seen={};
+    (tasks||[]).forEach(function(t,i){
+      var row=taskToRow(t,i,house);
+      seen[t.id]=true;
+      if(snapObj[t.id]!==JSON.stringify(row))ups.push(row);
+    });
+    for(var id in snapObj)if(!seen[id])dels.push(id);
+    return {ups:ups,dels:dels};
+  }
+  /*SYNC-PURE-END*/
+
+  function setSyncStatus(ok){
+    var s=document.getElementById("syncStatus");if(!s)return;
+    s.innerHTML='<span class="syncdot'+(ok?"":" off")+'"></span>'+(ok
+      ?"Ruti · live shared board — changes sync between your devices in seconds."
+      :"Ruti · offline — changes are saved on this device and sync when you're back online.");
+  }
+  function queueSync(){
+    if(!supa||!HOUSE)return;
+    (data&&data.tasks||[]).forEach(function(t,i){posMap[t.id]=i;}); /* local order is truth */
+    clearTimeout(syncTimer);syncTimer=setTimeout(pushSync,600);
+  }
+  function pushSync(){
+    if(!supa||!HOUSE||!data)return Promise.resolve();
+    var d=computeDiff(data.tasks,snap,HOUSE);
+    var s=JSON.stringify(data.sections||[]);
+    var jobs=[],now=new Date().toISOString();
+    if(d.ups.length)jobs.push(supa.from("tasks").upsert(d.ups.map(function(r){return Object.assign({},r,{updated_at:now,updated_by:myUid});})));
+    if(d.dels.length)jobs.push(supa.from("tasks").delete().in("id",d.dels));
+    if(s!==secSnap)jobs.push(supa.from("households").update({sections:data.sections}).eq("id",HOUSE));
+    if(!jobs.length)return Promise.resolve();
+    return Promise.all(jobs).then(function(res){
+      for(var i=0;i<res.length;i++)if(res[i]&&res[i].error)throw res[i].error;
+      d.ups.forEach(function(r){snap[r.id]=JSON.stringify(r);});
+      d.dels.forEach(function(id){delete snap[id];});
+      secSnap=s;
+      setSyncStatus(true);
+    }).catch(function(e){
+      setSyncStatus(false);
+      clearTimeout(retryTimer);retryTimer=setTimeout(pushSync,8000);
+    });
+  }
+  function sortByPos(){
+    if(!data||!data.tasks)return;
+    data.tasks.sort(function(a,b){
+      var pa=(posMap[a.id]!==undefined)?posMap[a.id]:1e9;
+      var pb=(posMap[b.id]!==undefined)?posMap[b.id]:1e9;
+      return pa-pb;
+    });
+  }
+  function scheduleRender(){
+    if(!data)return;
+    store(data);
+    if(dragId){pendingRender=true;return;}
+    render();
+  }
+  function onTaskEvent(p){
+    if(!data)return;
+    if(p.eventType==="DELETE"){
+      var oid=p.old&&p.old.id;if(!oid)return;
+      var had=!!byId(oid);
+      delete snap[oid];delete posMap[oid];
+      if(had){data.tasks=data.tasks.filter(function(x){return x.id!==oid;});scheduleRender();}
+      return;
+    }
+    var r=p.new;if(!r||!r.id)return;
+    var c=comparable(r);
+    if(snap[r.id]===c)return; /* our own echo */
+    snap[r.id]=c;posMap[r.id]=r.position;
+    var nt=rowToTask(r),ex=byId(r.id);
+    if(ex){for(var k in nt)ex[k]=nt[k];}
+    else data.tasks.push(nt);
+    sortByPos();
+    scheduleRender();
+  }
+  function onHouseEvent(p){
+    if(!data||!p.new||!p.new.sections)return;
+    var s=JSON.stringify(p.new.sections);
+    if(s===secSnap)return;
+    secSnap=s;data.sections=p.new.sections;
+    rebuildTimeSelects();scheduleRender();
+  }
+  function subscribeRealtime(){
+    if(!supa||!HOUSE||channel)return;
+    channel=supa.channel("ruti-"+HOUSE)
+      .on("postgres_changes",{event:"*",schema:"public",table:"tasks",filter:"household_id=eq."+HOUSE},onTaskEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"households",filter:"id=eq."+HOUSE},onHouseEvent)
+      .subscribe(function(status){if(status==="SUBSCRIBED")setSyncStatus(true);});
+  }
+  function ensureHousehold(user){
+    return supa.from("household_members").select("household_id,email,user_id,owner_key").then(function(res){
+      if(res.error)throw res.error;
+      var rows=res.data||[];
+      var em=(user.email||"").toLowerCase();
+      if(rows.length){
+        HOUSE=rows[0].household_id;
+        var mine=null;
+        rows.forEach(function(m){if((m.email||"").toLowerCase()===em)mine=m;});
+        myOwnerKey=mine?mine.owner_key:"tyler";
+        if(mine&&!mine.user_id)return supa.from("household_members").update({user_id:user.id}).eq("household_id",HOUSE).eq("email",mine.email);
+        return null;
+      }
+      /* first sign-in ever: create the household and invite the other parent */
+      var myKey=(em===DARCY_EMAIL)?"darcy":"tyler";
+      var otherEmail=(myKey==="tyler")?DARCY_EMAIL:TYLER_EMAIL;
+      var otherKey=(myKey==="tyler")?"darcy":"tyler";
+      return supa.from("households").insert({name:"Pruyn Household",created_by:user.id}).select().single().then(function(hh){
+        if(hh.error)throw hh.error;
+        HOUSE=hh.data.id;myOwnerKey=myKey;
+        return supa.from("household_members").insert([
+          {household_id:HOUSE,email:em,user_id:user.id,owner_key:myKey,role:"owner"},
+          {household_id:HOUSE,email:otherEmail,owner_key:otherKey,role:"member"}
+        ]).then(function(ins){if(ins.error)throw ins.error;});
+      });
+    });
+  }
+  function loadCloud(user){
+    myUid=user.id;
+    return ensureHousehold(user).then(function(){
+      return Promise.all([
+        supa.from("households").select("sections").eq("id",HOUSE).single(),
+        supa.from("tasks").select("*").eq("household_id",HOUSE).order("position",{ascending:true})
+      ]);
+    }).then(function(res){
+      var hh=res[0],tr=res[1];
+      if(hh.error)throw hh.error;
+      if(tr.error)throw tr.error;
+      var rows=tr.data||[];
+      var local=migrate(load());
+      snap={};posMap={};
+      if(!rows.length){
+        /* cloud board is empty: migrate this device's board up (or seed a fresh one) */
+        var hadLocal=!!(local&&local.tasks&&local.tasks.length);
+        data=hadLocal?local:seed();
+        data.currentUser=myOwnerKey;
+        secSnap="";
+        return pushSync().then(function(){
+          if(hadLocal)toast("Moved this device's board to your shared family board");
+        });
+      }
+      data={sections:hh.data.sections||DEFAULT_SECTIONS.slice(),tasks:rows.map(rowToTask),
+        lastOpened:local?local.lastOpened:null,currentUser:myOwnerKey};
+      rows.forEach(function(r){snap[r.id]=comparable(r);posMap[r.id]=r.position;});
+      secSnap=JSON.stringify(hh.data.sections||[]);
+      newDayReset(data);
+      return null;
+    }).then(function(){subscribeRealtime();});
+  }
+  function setUserUI(user){
+    var name=(OWNERS[myOwnerKey]&&OWNERS[myOwnerKey].name)||(user.user_metadata&&user.user_metadata.name)||user.email||"";
+    var w=document.getElementById("welcomeTxt");if(w)w.textContent="Welcome, "+name;
+    var av=document.getElementById("avatarEl");
+    var pic=user.user_metadata&&(user.user_metadata.avatar_url||user.user_metadata.picture);
+    if(av){
+      if(pic)av.innerHTML='<img src="'+String(pic).replace(/"/g,"")+'" alt="" referrerpolicy="no-referrer"/>';
+      else av.textContent=(name.charAt(0)||"·").toUpperCase();
+    }
+  }
+
   /* ---------- seed ---------- */
   function seed(){
     var id=0;function n(){return"t"+(++id)+"-"+Math.random().toString(36).slice(2,6);}
@@ -540,14 +760,13 @@
   }
 
   /* ---------- state ---------- */
-  var data=migrate(load())||seed();
-  if(!data.tasks)data=seed();
+  var data=null; /* assigned during boot (cloud load, or local fallback) */
   var filters={owner:"all",time:"all",today:false,crit:false,q:"",showSched:false};
   var view="board";
   var filtersOpen=false;
   var editingId=null;
 
-  function save(){store(data);}
+  function save(){if(!data)return;store(data);queueSync();}
   function byId(id){for(var i=0;i<data.tasks.length;i++)if(data.tasks[i].id===id)return data.tasks[i];return null;}
 
   /* ---------- filtering ---------- */
@@ -692,6 +911,7 @@
   }
 
   function render(){
+    if(!data)return;
     closeMenu();
     var all=data.tasks;
     var board=el("board");
@@ -989,6 +1209,7 @@
   el("board").addEventListener("dragend",function(e){
     var c=e.target.closest(".card");if(c)c.classList.remove("dragging");
     clearDrops();dragId=null;dropInfo=null;
+    if(pendingRender){pendingRender=false;render();}
   });
   el("board").addEventListener("dragover",function(e){
     var col=e.target.closest(".col");if(!col)return;
@@ -1079,12 +1300,51 @@
   el("scrim").addEventListener("click",function(e){if(e.target===el("scrim"))closeModal();});
   document.addEventListener("keydown",function(e){if(e.key==="Escape"){closeModal();closeSecModal();closeMenu();}});
 
-  // init
-  rebuildTimeSelects();
-  render();
+  // init — Phase 2: auth gate first, then cloud load; falls back to local-only if Supabase is unreachable
+  function showGate(){el("authGate").className="authgate";el("appWrap").className="wrap hidden";}
+  function showApp(){el("authGate").className="authgate hidden";el("appWrap").className="wrap";}
+  var booted=false;
+  function boot(session){
+    if(booted)return;booted=true;
+    loadCloud(session.user).then(function(){
+      setSyncStatus(true);
+    }).catch(function(e){
+      /* cloud unreachable: show this device's cached board, retry sync later */
+      data=migrate(load())||seed();
+      data.currentUser=myOwnerKey;
+      setSyncStatus(false);
+      toast("Offline — showing this device's copy");
+    }).then(function(){
+      setUserUI(session.user);
+      showApp();
+      rebuildTimeSelects();
+      render();
+    });
+  }
+  if(!supa){
+    /* supabase script failed to load — behave like V1 (local only) */
+    data=migrate(load())||seed();
+    if(!data.tasks)data=seed();
+    showApp();setSyncStatus(false);
+    rebuildTimeSelects();render();
+  } else {
+    supa.auth.onAuthStateChange(function(evt,session){
+      if(session){boot(session);}
+      else{booted=false;showGate();}
+    });
+    el("googleBtn").addEventListener("click",function(){
+      supa.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+    });
+    el("accountBtn").addEventListener("click",function(){
+      supa.auth.getSession().then(function(r){
+        if(r.data&&r.data.session&&confirm("Sign out of Ruti?"))supa.auth.signOut();
+      });
+    });
+    window.addEventListener("online",function(){pushSync();});
+  }
 
   // expose for tests
-  window.__TANDEM__={risk:risk,passes:passes,passesBoard:passesBoard,scheduledAway:scheduledAway,snoozedAway:snoozedAway,dayHidden:dayHidden,newDayReset:newDayReset,effDate:effDate,nextDue:nextDue,bucketOf:bucketOf,blockPast:blockPast,todoSections:todoSections,card:card,sections:sections,hourLabel:hourLabel,secRowHTML:secRowHTML,get:function(){return data;},setFilters:function(f){filters=Object.assign(filters,f);}};
+  window.__TANDEM__={risk:risk,passes:passes,passesBoard:passesBoard,scheduledAway:scheduledAway,snoozedAway:snoozedAway,dayHidden:dayHidden,newDayReset:newDayReset,effDate:effDate,nextDue:nextDue,bucketOf:bucketOf,blockPast:blockPast,todoSections:todoSections,card:card,sections:sections,hourLabel:hourLabel,secRowHTML:secRowHTML,taskToRow:taskToRow,rowToTask:rowToTask,computeDiff:computeDiff,comparable:comparable,get:function(){return data;},setData:function(d){data=d;},setFilters:function(f){filters=Object.assign(filters,f);}};
 })();
 </script>
 </body>
